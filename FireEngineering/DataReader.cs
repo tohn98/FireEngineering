@@ -103,27 +103,19 @@ namespace FireEngineering
     WordprocessingDocument doc,
     NumberingState state)
         {
-            string text = string.Join("", p.Descendants<Text>().Select(t => t.Text));
+            var text = string.Join("", p.Descendants<Text>().Select(t => t.Text)).Trim();
 
             var numPr = p.Descendants<NumberingProperties>().FirstOrDefault();
             if (numPr == null)
-                return text; // Not numbered
+                return ""; // Not numbered
 
             var numId = numPr.NumberingId?.Val?.Value;
             var ilvl = numPr.NumberingLevelReference?.Val?.Value ?? 0;
 
             if (numId == null)
-                return text;
+                return "";
 
             var key = (numId.Value, ilvl);
-
-            // Increase our counter
-            if (!state.Counters.ContainsKey(key))
-                state.Counters[key] = 1;
-            else
-                state.Counters[key]++;
-
-            int number = state.Counters[key];
 
             // Load numbering definitions
             var numberingPart = doc.MainDocumentPart.NumberingDefinitionsPart;
@@ -144,12 +136,21 @@ namespace FireEngineering
                 .Elements<Level>()
                 .First(l => l.LevelIndex == ilvl);
 
-            string lvlText = level.LevelText?.Val ?? "%1.";
+            // Check for custom start value
+            int startValue = 1;
+            var start = level.Elements<StartNumberingValue>().FirstOrDefault();
+            if (start != null && start.Val != null)
+                startValue = (int)start.Val.Value;
 
-            // Replace %1, %2, etc. with actual numbers
-            string formattedNumber = lvlText.Replace("%" + (ilvl + 1).ToString(), number.ToString());
+            // Initialize or increment counter
+            if (!state.Counters.ContainsKey(key))
+                state.Counters[key] = startValue;
+            else
+                state.Counters[key]++;
 
-            return formattedNumber + " " + text;
+            int number = state.Counters[key];
+
+            return number.ToString();
         }
 
         private static List<string> GetCellValues(TableCell cell)
