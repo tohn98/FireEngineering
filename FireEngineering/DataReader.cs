@@ -4,7 +4,6 @@ using A = DocumentFormat.OpenXml.Drawing;
 using TableRow = DocumentFormat.OpenXml.Wordprocessing.TableRow;
 using TableCell = DocumentFormat.OpenXml.Wordprocessing.TableCell;
 using Table = DocumentFormat.OpenXml.Wordprocessing.Table;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace FireEngineering
 {
@@ -17,13 +16,18 @@ namespace FireEngineering
     public class DataReader
     {
 
-        public static List<ProtocolDataModel> Read() {
+        public static List<ProtocolDataModel> Read(string folderPath, DateTime startDate, Action<string> logInfo = null)
+        {
             List<ProtocolDataModel> allRecords = new List<ProtocolDataModel>();
 
-            string[] files = Directory.GetFiles(@"D:\FireEngineering\Examples", "*.docx");
+            // Recursively get all .docx files in the folder and subfolders
+            string[] files = Directory.GetFiles(folderPath, "*.docx", SearchOption.AllDirectories)
+                .Where(f => File.GetLastWriteTime(f) >= startDate)
+                .ToArray();
 
             foreach (var file in files)
             {
+                logInfo?.Invoke($"Reading file: {file}");
                 using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(file, false))
                 {
                     var tables = wordDoc.MainDocumentPart.Document.Body.Elements<Table>();
@@ -34,11 +38,9 @@ namespace FireEngineering
 
                         var rows = table.Elements<TableRow>().Skip(1); // skip header row
 
-
                         ProtocolDataModel lastRecord = new ProtocolDataModel();
                         foreach (var row in rows)
                         {
-
                             var state = new NumberingState();
 
                             foreach (var cell in row.Elements<TableCell>())
@@ -46,7 +48,7 @@ namespace FireEngineering
                                 foreach (var p in cell.Elements<Paragraph>())
                                 {
                                     string numberedText = GetNumberedParagraphText(p, wordDoc, state);
-                                    Console.WriteLine(numberedText);
+                                    // Logging removed, was: Console.WriteLine(numberedText);
                                 }
                             }
 
@@ -62,9 +64,9 @@ namespace FireEngineering
                             string changed = !string.IsNullOrWhiteSpace(cells[6].InnerText) ? cells[6].InnerText.Trim() : lastRecord.Changed;
                             string changeDate = !string.IsNullOrWhiteSpace(cells[7].InnerText) ? cells[7].InnerText.Trim() : lastRecord.ChangeDate;
                             string changeName = !string.IsNullOrWhiteSpace(cells[8].InnerText) ? cells[8].InnerText.Trim() : lastRecord.WorkerName;
-                         
+
                             var (data, rotation) = GetImageFromCell(cells[9], wordDoc);
-                            var signature = data != null ? (data,rotation) : lastRecord.Signature;
+                            var signature = data != null ? (data, rotation) : lastRecord.Signature;
                             int stickerId = int.TryParse(cells[10].InnerText, out var id) ? id : 0;
 
                             var currentRecord = new ProtocolDataModel()
