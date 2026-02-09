@@ -45,6 +45,14 @@ namespace FireEngineering
                             var cells = row.Elements<TableCell>().ToList();
                             if (cells.Count < 11) continue; // now 11 columns expected
 
+                            string changeDate = !string.IsNullOrWhiteSpace(cells[7].InnerText) ? cells[7].InnerText.Trim() : lastRecord.ChangeDate;
+                            // Row-level filter: only include if changeDate >= startDate
+                            DateTime rowChangeDate;
+                            if (!DateTime.TryParse(changeDate, out rowChangeDate) || rowChangeDate < startDate)
+                            {
+                                continue;
+                            }
+
                             var stickerCell = cells[10];
                             string stickerValue = null;
                             
@@ -73,8 +81,9 @@ namespace FireEngineering
                             string type = !string.IsNullOrWhiteSpace(cells[4].InnerText) ? cells[4].InnerText.Trim() : lastRecord.Type;
                             string changeType = !string.IsNullOrWhiteSpace(cells[5].InnerText) ? cells[5].InnerText.Trim() : lastRecord.ChangeType;
                             string changed = !string.IsNullOrWhiteSpace(cells[6].InnerText) ? cells[6].InnerText.Trim() : lastRecord.Changed;
-                            string changeDate = !string.IsNullOrWhiteSpace(cells[7].InnerText) ? cells[7].InnerText.Trim() : lastRecord.ChangeDate;
                             string changeName = !string.IsNullOrWhiteSpace(cells[8].InnerText) ? cells[8].InnerText.Trim() : lastRecord.WorkerName;
+
+                            
 
                             var (data, rotation) = GetImageFromCell(cells[9], wordDoc);
                             var signature = data != null ? (data, rotation) : lastRecord.Signature;
@@ -98,8 +107,6 @@ namespace FireEngineering
                             allRecords.Add(currentRecord);
 
                             lastRecord = currentRecord;
-
-                            var test = GetCellValues(cells[10]);
                         }
                     }
                 }
@@ -161,21 +168,6 @@ namespace FireEngineering
             int number = state.Counters[key];
 
             return number.ToString();
-        }
-
-        private static List<string> GetCellValues(TableCell cell)
-        {
-            if (cell == null) return new List<string>();
-
-            // Each paragraph inside a cell can represent a separate value
-            var values = cell.Elements<DocumentFormat.OpenXml.Wordprocessing.Paragraph>()
-                             .Select(p => string.Join(" ",
-                                  p.Descendants<DocumentFormat.OpenXml.Wordprocessing.Text>()
-                                   .Select(t => t.Text)))
-                             .Where(v => !string.IsNullOrWhiteSpace(v))
-                             .ToList();
-
-            return values;
         }
 
         public static (byte[] ImageData, int Rotation) GetImageFromCell(TableCell cell, WordprocessingDocument doc)

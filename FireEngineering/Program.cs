@@ -66,8 +66,23 @@
             try
             {
                 List<ProtocolDataModel> rows = DataReader.Read(folderPath, startDate, LogInfo);
-                WordTableWriter.WriteCombinedDoc(outputFile, rows);
-                LogInfo($"Successfully wrote output to {outputFile}");
+                if(rows.Count == 0)
+                {
+                    Log("No records found matching the criteria.");
+                    return;
+                }
+                string targetFile = outputFile;
+#if DEBUG
+                string debugFile = Path.Combine(Path.GetDirectoryName(outputFile), Path.GetFileNameWithoutExtension(outputFile) + Guid.NewGuid() + Path.GetExtension(outputFile));
+                if (File.Exists(outputFile))
+                {
+                    File.Copy(outputFile, debugFile, true);
+                }
+                targetFile = debugFile;
+                LogInfo($"DEBUG: Writing to debug copy: {targetFile}");
+#endif
+                WordTableWriter.WriteCombinedDoc(targetFile, rows);
+                LogInfo($"Successfully wrote output to {targetFile}");
             }
             catch (Exception ex)
             {

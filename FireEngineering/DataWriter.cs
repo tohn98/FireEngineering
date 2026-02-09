@@ -61,7 +61,8 @@ public static class WordTableWriter
 
         var cell = new TableCell(
             new TableCellProperties(
-                new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = width }
+                new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = width },
+                new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center }
             ),
             para
         );
