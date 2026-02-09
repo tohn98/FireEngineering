@@ -38,22 +38,33 @@ namespace FireEngineering
 
                         var rows = table.Elements<TableRow>().Skip(1); // skip header row
 
+                        var state = new NumberingState();
                         ProtocolDataModel lastRecord = new ProtocolDataModel();
                         foreach (var row in rows)
                         {
-                            var state = new NumberingState();
-
-                            foreach (var cell in row.Elements<TableCell>())
-                            {
-                                foreach (var p in cell.Elements<Paragraph>())
-                                {
-                                    string numberedText = GetNumberedParagraphText(p, wordDoc, state);
-                                    // Logging removed, was: Console.WriteLine(numberedText);
-                                }
-                            }
-
                             var cells = row.Elements<TableCell>().ToList();
                             if (cells.Count < 11) continue; // now 11 columns expected
+
+                            var stickerCell = cells[10];
+                            string stickerValue = null;
+                            
+
+
+                            if (string.IsNullOrEmpty(stickerCell.InnerText?.Trim()))
+                            {
+                                var para = stickerCell.Elements<Paragraph>().FirstOrDefault();
+                                if (para != null)
+                                {
+                                    stickerValue = GetNumberedParagraphText(para, wordDoc, state);
+                                }
+                            }
+                            else 
+                            { 
+                                stickerValue = stickerCell.InnerText?.Trim();
+                            }
+
+                            int stickerId = 0;
+                            int.TryParse(stickerValue, out stickerId);
 
                             // stable columns (carry forward if empty)
                             var (brand, serial) = !string.IsNullOrWhiteSpace(cells[1].InnerText) ? SplitBrandAndSerial(cells[1].InnerText.Trim()) : (lastRecord.BrandAndModel, lastRecord.Serial);
@@ -67,7 +78,6 @@ namespace FireEngineering
 
                             var (data, rotation) = GetImageFromCell(cells[9], wordDoc);
                             var signature = data != null ? (data, rotation) : lastRecord.Signature;
-                            int stickerId = int.TryParse(cells[10].InnerText, out var id) ? id : 0;
 
                             var currentRecord = new ProtocolDataModel()
                             {
