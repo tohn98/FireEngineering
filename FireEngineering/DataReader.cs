@@ -1,9 +1,10 @@
 ﻿using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using A = DocumentFormat.OpenXml.Drawing;
-using TableRow = DocumentFormat.OpenXml.Wordprocessing.TableRow;
-using TableCell = DocumentFormat.OpenXml.Wordprocessing.TableCell;
+using Paragraph = DocumentFormat.OpenXml.Wordprocessing.Paragraph;
 using Table = DocumentFormat.OpenXml.Wordprocessing.Table;
+using TableCell = DocumentFormat.OpenXml.Wordprocessing.TableCell;
+using TableRow = DocumentFormat.OpenXml.Wordprocessing.TableRow;
 
 namespace FireEngineering
 {
@@ -55,8 +56,6 @@ namespace FireEngineering
 
                             var stickerCell = cells[10];
                             string stickerValue = null;
-                            
-
 
                             if (string.IsNullOrEmpty(stickerCell.InnerText?.Trim()))
                             {
@@ -66,8 +65,8 @@ namespace FireEngineering
                                     stickerValue = GetNumberedParagraphText(para, wordDoc, state);
                                 }
                             }
-                            else 
-                            { 
+                            else
+                            {
                                 stickerValue = stickerCell.InnerText?.Trim();
                             }
 
@@ -82,8 +81,6 @@ namespace FireEngineering
                             string changeType = !string.IsNullOrWhiteSpace(cells[5].InnerText) ? cells[5].InnerText.Trim() : lastRecord.ChangeType;
                             string changed = !string.IsNullOrWhiteSpace(cells[6].InnerText) ? cells[6].InnerText.Trim() : lastRecord.Changed;
                             string changeName = !string.IsNullOrWhiteSpace(cells[8].InnerText) ? cells[8].InnerText.Trim() : lastRecord.WorkerName;
-
-                            
 
                             var (data, rotation) = GetImageFromCell(cells[9], wordDoc);
                             var signature = data != null ? (data, rotation) : lastRecord.Signature;
