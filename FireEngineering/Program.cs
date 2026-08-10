@@ -71,18 +71,22 @@
                     Log("No records found matching the criteria.");
                     return;
                 }
-                string targetFile = outputFile;
-#if DEBUG
-                string debugFile = Path.Combine(Path.GetDirectoryName(outputFile), Path.GetFileNameWithoutExtension(outputFile) + Guid.NewGuid() + Path.GetExtension(outputFile));
-                if (File.Exists(outputFile))
+
+                foreach(var row in rows.OrderBy(x => DateTime.Parse(x.ChangeDate)).ToList().GroupBy(x=> DateTime.Parse(x.ChangeDate).Month))
                 {
-                    File.Copy(outputFile, debugFile, true);
+                    string debugFile = Path.Combine(Path.GetDirectoryName(outputFile), Path.GetFileNameWithoutExtension(outputFile) +$"___{row.Key}" + Path.GetExtension(outputFile));
+                    if (File.Exists(outputFile))
+                    {
+                        File.Copy(outputFile, debugFile, true);
+                    }
+                    var targetFile = debugFile;
+                    LogInfo($"DEBUG: Writing to debug copy: {targetFile}");
+
+                    WordTableWriter.WriteCombinedDoc(targetFile, row.ToList());
+                    LogInfo($"Successfully wrote output to {targetFile}");
                 }
-                targetFile = debugFile;
-                LogInfo($"DEBUG: Writing to debug copy: {targetFile}");
-#endif
-                WordTableWriter.WriteCombinedDoc(targetFile, rows);
-                LogInfo($"Successfully wrote output to {targetFile}");
+                
+                
             }
             catch (Exception ex)
             {
