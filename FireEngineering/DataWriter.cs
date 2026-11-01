@@ -144,24 +144,22 @@ public static class WordTableWriter
             int newWidth = (int)(image.Width * scale);
             int newHeight = (int)(image.Height * scale);
 
-            using (var bitmap = new System.Drawing.Bitmap(newWidth, newHeight))
-            using (var g = System.Drawing.Graphics.FromImage(bitmap))
+            using var bitmap = new System.Drawing.Bitmap(newWidth, newHeight);
+            using var g = System.Drawing.Graphics.FromImage(bitmap);
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            g.DrawImage(image, 0, 0, newWidth, newHeight);
+
+            using (var output = new MemoryStream())
             {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.DrawImage(image, 0, 0, newWidth, newHeight);
+                var encoder = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
+                    .First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
 
-                using (var output = new MemoryStream())
-                {
-                    var encoder = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders()
-                        .First(c => c.FormatID == System.Drawing.Imaging.ImageFormat.Jpeg.Guid);
+                var parameters = new System.Drawing.Imaging.EncoderParameters(1);
+                parameters.Param[0] = new System.Drawing.Imaging.EncoderParameter(
+                    System.Drawing.Imaging.Encoder.Quality, 80L); // 80% quality
 
-                    var parameters = new System.Drawing.Imaging.EncoderParameters(1);
-                    parameters.Param[0] = new System.Drawing.Imaging.EncoderParameter(
-                        System.Drawing.Imaging.Encoder.Quality, 80L); // 80% quality
-
-                    bitmap.Save(output, encoder, parameters);
-                    return output.ToArray();
-                }
+                bitmap.Save(output, encoder, parameters);
+                return output.ToArray();
             }
         }
     }

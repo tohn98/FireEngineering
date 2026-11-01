@@ -28,23 +28,31 @@ namespace FireEngineering
 
             foreach (var file in files)
             {
-                logInfo?.Invoke($"Reading file: {file}");
-                using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(file, false))
+                if (Path.GetFileName(file).StartsWith("~$", StringComparison.Ordinal))
                 {
-                    var tables = wordDoc.MainDocumentPart.Document.Body.Elements<Table>();
+                    logInfo?.Invoke($"Skipping Word temporary lock file: {file}");
+                    continue;
+                }
 
-                    foreach (var table in tables)
+                try
+                {
+                    logInfo?.Invoke($"Reading file: {file}");
+                    using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(file, false))
                     {
-                        if (table == null) continue;
+                        var tables = wordDoc.MainDocumentPart.Document.Body.Elements<Table>();
 
-                        var rows = table.Elements<TableRow>().Skip(1); // skip header row
-
-                        var state = new NumberingState();
-                        ProtocolDataModel lastRecord = new ProtocolDataModel();
-                        foreach (var row in rows)
+                        foreach (var table in tables)
                         {
-                            var cells = row.Elements<TableCell>().ToList();
-                            if (cells.Count < 11) continue; // now 11 columns expected
+                            if (table == null) continue;
+
+                            var rows = table.Elements<TableRow>().Skip(1); // skip header row
+
+                            var state = new NumberingState();
+                            ProtocolDataModel lastRecord = new ProtocolDataModel();
+                            foreach (var row in rows)
+                            {
+                                var cells = row.Elements<TableCell>().ToList();
+                                if (cells.Count < 11) continue; // now 11 columns expected
 
                             string changeDate = !string.IsNullOrWhiteSpace(cells[7].InnerText) ? cells[7].InnerText.Trim() : lastRecord.ChangeDate;
                             // Row-level filter: only include if changeDate >= startDate
@@ -103,9 +111,19 @@ namespace FireEngineering
                             // Add record
                             allRecords.Add(currentRecord);
 
-                            lastRecord = currentRecord;
+                                lastRecord = currentRecord;
+                            }
                         }
                     }
+
+                    logInfo?.Invoke($"INFO: Finished reading file: {file}");
+                }
+                catch (Exception ex)
+                {
+                    logInfo?.Invoke(
+                        $"ERROR: Failed to read file: {file}{Environment.NewLine}" +
+                        $"Message: {ex.Message}{Environment.NewLine}" +
+                        $"StackTrace: {ex.StackTrace}");
                 }
             }
 
@@ -212,11 +230,5 @@ namespace FireEngineering
 
             return (input.Trim(), "");
         }
-    }
-
-    public class RowImage
-    {
-        public TableRow Row { get; set; }
-        public byte[] ImageData { get; set; }
     }
 }
