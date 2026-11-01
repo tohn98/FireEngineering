@@ -19,7 +19,18 @@
             get
             {
                 if (DateTime.TryParse(ChangeDate, out var dt))
-                    return dt.AddYears(1).ToString("dd-MM-yyyy");
+                {
+                    int years = Changed switch
+                    {
+                        "Техническо обслужване" => 1,
+                        "Хидростатично изпитание" => 10,
+                        _ when Changed?.StartsWith("Презареждане", StringComparison.Ordinal) == true => 5,
+                        _ => 1
+                    };
+
+                    return dt.AddYears(years).ToString("dd-MM-yyyy");
+                }
+
                 return "";
             }
         }
