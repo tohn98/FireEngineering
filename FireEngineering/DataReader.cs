@@ -37,6 +37,8 @@ namespace FireEngineering
                 try
                 {
                     logInfo?.Invoke($"Reading file: {file}");
+                    var fileMonths = new HashSet<string>();
+
                     using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(file, false))
                     {
                         var tables = wordDoc.MainDocumentPart.Document.Body.Elements<Table>();
@@ -110,6 +112,12 @@ namespace FireEngineering
 
                             // Add record
                             allRecords.Add(currentRecord);
+
+                            string month = rowChangeDate.ToString("yyyy-MM");
+                            if (fileMonths.Add(month))
+                            {
+                                logInfo?.Invoke($"INFO: Month {month} received records from file: {file}");
+                            }
 
                                 lastRecord = currentRecord;
                             }

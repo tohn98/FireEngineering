@@ -72,17 +72,24 @@
                     return;
                 }
 
-                foreach(var row in rows.OrderBy(x => DateTime.Parse(x.ChangeDate)).ToList().GroupBy(x=> DateTime.Parse(x.ChangeDate).Month))
+                foreach (var group in rows
+                    .Where(x => DateTime.TryParse(x.ChangeDate, out _))
+                    .OrderBy(x => DateTime.Parse(x.ChangeDate))
+                    .GroupBy(x => DateTime.Parse(x.ChangeDate).ToString("yyyy-MM")))
                 {
-                    string debugFile = Path.Combine(Path.GetDirectoryName(outputFile), Path.GetFileNameWithoutExtension(outputFile) +$"___{row.Key}" + Path.GetExtension(outputFile));
+                    string debugFile = Path.Combine(
+                        Path.GetDirectoryName(outputFile)!,
+                        $"{Path.GetFileNameWithoutExtension(outputFile)}___{group.Key}{Path.GetExtension(outputFile)}");
+
                     if (File.Exists(outputFile))
                     {
                         File.Copy(outputFile, debugFile, true);
                     }
-                    var targetFile = debugFile;
-                    LogInfo($"DEBUG: Writing to debug copy: {targetFile}");
 
-                    WordTableWriter.WriteCombinedDoc(targetFile, row.ToList());
+                    var targetFile = debugFile;
+                    LogInfo($"Writing month {group.Key} to {targetFile}");
+
+                    WordTableWriter.WriteCombinedDoc(targetFile, group.ToList());
                     LogInfo($"Successfully wrote output to {targetFile}");
                 }
                 

@@ -23,8 +23,9 @@
                     int years = Changed switch
                     {
                         "Техническо обслужване" => 1,
-                        "Хидростатично изпитание" => 10,
-                        _ when Changed?.StartsWith("Презареждане", StringComparison.Ordinal) == true => 5,
+                        _ when Changed?.StartsWith("Хидростатично", StringComparison.OrdinalIgnoreCase) == true => 10,
+                        _ when Changed?.StartsWith("хидравлично", StringComparison.OrdinalIgnoreCase) == true => 10,
+                        _ when Changed?.StartsWith("Презареждане", StringComparison.OrdinalIgnoreCase) == true => 5,
                         _ => 1
                     };
 
