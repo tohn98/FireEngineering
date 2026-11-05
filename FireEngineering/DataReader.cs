@@ -17,7 +17,11 @@ namespace FireEngineering
     public class DataReader
     {
 
-        public static List<ProtocolDataModel> Read(string folderPath, DateTime startDate, Action<string> logInfo = null)
+        public static List<ProtocolDataModel> Read(
+            string folderPath,
+            DateTime startDate,
+            Action<string> logInfo = null,
+            Action<int, int> readProgress = null)
         {
             List<ProtocolDataModel> allRecords = new List<ProtocolDataModel>();
 
@@ -26,8 +30,23 @@ namespace FireEngineering
                 .Where(f => File.GetLastWriteTime(f) >= startDate)
                 .ToArray();
 
+            string[] nonDocxFiles = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
+                .Where(f => !string.Equals(Path.GetExtension(f), ".docx", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            foreach (var file in nonDocxFiles)
+            {
+                logInfo?.Invoke($"Skipping non-.docx file: {file}");
+            }
+
+            int totalFiles = files.Length;
+            int fileNumber = 0;
+
             foreach (var file in files)
             {
+                fileNumber++;
+                readProgress?.Invoke(fileNumber, totalFiles);
+
                 if (Path.GetFileName(file).StartsWith("~$", StringComparison.Ordinal))
                 {
                     logInfo?.Invoke($"Skipping Word temporary lock file: {file}");

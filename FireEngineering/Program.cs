@@ -65,18 +65,37 @@
 
             try
             {
-                List<ProtocolDataModel> rows = DataReader.Read(folderPath, startDate, LogInfo);
+                List<ProtocolDataModel> rows = DataReader.Read(
+                    folderPath,
+                    startDate,
+                    LogInfo,
+                    (current, total) => Console.WriteLine($"Reading {current}/{total}"));
                 if(rows.Count == 0)
                 {
                     Log("No records found matching the criteria.");
                     return;
                 }
 
-                foreach (var group in rows
+                var seenStickerIds = new HashSet<(int StickerId, DateTime ChangeDate)>();
+                rows = rows
+                    .Where(row =>
+                        row.StickerId == 0 ||
+                        (DateTime.TryParse(row.ChangeDate, out var changeDate) &&
+                         seenStickerIds.Add((row.StickerId, changeDate.Date))))
+                    .ToList();
+
+                var groups = rows
                     .Where(x => DateTime.TryParse(x.ChangeDate, out _))
                     .OrderBy(x => DateTime.Parse(x.ChangeDate))
-                    .GroupBy(x => DateTime.Parse(x.ChangeDate).ToString("yyyy-MM")))
+                    .GroupBy(x => DateTime.Parse(x.ChangeDate).ToString("yyyy-MM"))
+                    .ToList();
+
+                int groupNumber = 0;
+                foreach (var group in groups)
                 {
+                    groupNumber++;
+                    Console.WriteLine($"Writing {groupNumber}/{groups.Count}");
+
                     string debugFile = Path.Combine(
                         Path.GetDirectoryName(outputFile)!,
                         $"{Path.GetFileNameWithoutExtension(outputFile)}___{group.Key}{Path.GetExtension(outputFile)}");
