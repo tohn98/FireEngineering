@@ -25,6 +25,18 @@
             void LogInfo(string message) => Log($"INFO: {message}");
             void LogError(string message) => Log($"ERROR: {message}");
 
+            AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
+            {
+                if (eventArgs.ExceptionObject is Exception exception)
+                {
+                    LogError($"FATAL unhandled exception: {exception}");
+                }
+                else
+                {
+                    LogError($"FATAL unhandled exception: {eventArgs.ExceptionObject}");
+                }
+            };
+
             // Always read from appsettings.json
             string configPath = Path.Combine(exeDir, "appsettings.json");
             if (!File.Exists(configPath))
@@ -63,11 +75,18 @@
                 return;
             }
 
+            string temporaryImageFolder = Path.Combine(
+                Path.GetTempPath(),
+                $"FireEngineeringImages_{Guid.NewGuid():N}");
+
+            Directory.CreateDirectory(temporaryImageFolder);
+
             try
             {
                 List<ProtocolDataModel> rows = DataReader.Read(
                     folderPath,
                     startDate,
+                    temporaryImageFolder,
                     LogInfo,
                     (current, total) => Console.WriteLine($"Reading {current}/{total}"));
                 if(rows.Count == 0)
@@ -117,6 +136,20 @@
             catch (Exception ex)
             {
                 LogError($"Unhandled exception: {ex.Message}\r\n{ex.StackTrace}");
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(temporaryImageFolder))
+                    {
+                        Directory.Delete(temporaryImageFolder, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogError($"Failed to delete temporary image folder: {ex.Message}");
+                }
             }
         }
     }

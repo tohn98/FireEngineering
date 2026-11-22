@@ -1,4 +1,5 @@
 ﻿using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Wordprocessing;
 using A = DocumentFormat.OpenXml.Drawing;
 using Paragraph = DocumentFormat.OpenXml.Wordprocessing.Paragraph;
@@ -16,10 +17,10 @@ namespace FireEngineering
 
     public class DataReader
     {
-
         public static List<ProtocolDataModel> Read(
             string folderPath,
             DateTime startDate,
+            string imageFolder,
             Action<string> logInfo = null,
             Action<int, int> readProgress = null)
         {
@@ -60,18 +61,43 @@ namespace FireEngineering
 
                     using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(file, false))
                     {
-                        var tables = wordDoc.MainDocumentPart.Document.Body.Elements<Table>();
-
-                        foreach (var table in tables)
+                        using (var reader = OpenXmlReader.Create(wordDoc.MainDocumentPart))
                         {
-                            if (table == null) continue;
+                            NumberingState state = null;
+                            ProtocolDataModel lastRecord = null;
+                            int tableDepth = -1;
+                            int tableRowCount = 0;
 
-                            var rows = table.Elements<TableRow>().Skip(1); // skip header row
-
-                            var state = new NumberingState();
-                            ProtocolDataModel lastRecord = new ProtocolDataModel();
-                            foreach (var row in rows)
+                            while (reader.Read())
                             {
+                                if (reader.ElementType == typeof(Table))
+                                {
+                                    if (reader.IsStartElement)
+                                    {
+                                        tableDepth = reader.Depth;
+                                        tableRowCount = 0;
+                                        state = new NumberingState();
+                                        lastRecord = new ProtocolDataModel();
+                                    }
+                                    else if (reader.Depth == tableDepth)
+                                    {
+                                        tableDepth = -1;
+                                    }
+
+                                    continue;
+                                }
+
+                                if (!reader.IsStartElement ||
+                                    reader.ElementType != typeof(TableRow) ||
+                                    reader.Depth != tableDepth + 1)
+                                {
+                                    continue;
+                                }
+
+                                tableRowCount++;
+                                var row = (TableRow)reader.LoadCurrentElement();
+                                if (tableRowCount == 1) continue; // skip header row
+
                                 var cells = row.Elements<TableCell>().ToList();
                                 if (cells.Count < 11) continue; // now 11 columns expected
 
@@ -111,7 +137,15 @@ namespace FireEngineering
                             string changed = !string.IsNullOrWhiteSpace(cells[6].InnerText) ? cells[6].InnerText.Trim() : lastRecord.Changed;
                             string changeName = !string.IsNullOrWhiteSpace(cells[8].InnerText) ? cells[8].InnerText.Trim() : lastRecord.WorkerName;
 
-                            var (data, rotation) = GetImageFromCell(cells[9], wordDoc);
+                            logInfo?.Invoke($"Starting signature extraction: {file}");
+                            var (data, rotation) = GetImageFromCell(cells[9], wordDoc, imageFolder);
+                            logInfo?.Invoke($"Finished signature extraction: {file}");
+
+                            if (data == null)
+                            {
+                                logInfo?.Invoke($"Signature image was skipped or unavailable in file: {file}");
+                            }
+
                             var signature = data != null ? (data, rotation) : lastRecord.Signature;
 
                             var currentRecord = new ProtocolDataModel()
@@ -135,7 +169,7 @@ namespace FireEngineering
                             string month = rowChangeDate.ToString("yyyy-MM");
                             if (fileMonths.Add(month))
                             {
-                                logInfo?.Invoke($"INFO: Month {month} received records from file: {file}");
+                                logInfo?.Invoke($"Month {month} received records from file: {file}");
                             }
 
                                 lastRecord = currentRecord;
@@ -143,7 +177,7 @@ namespace FireEngineering
                         }
                     }
 
-                    logInfo?.Invoke($"INFO: Finished reading file: {file}");
+                    logInfo?.Invoke($"Finished reading file: {file}");
                 }
                 catch (Exception ex)
                 {
@@ -212,7 +246,10 @@ namespace FireEngineering
             return number.ToString();
         }
 
-        public static (byte[] ImageData, int Rotation) GetImageFromCell(TableCell cell, WordprocessingDocument doc)
+        public static (string FilePath, int Rotation) GetImageFromCell(
+            TableCell cell,
+            WordprocessingDocument doc,
+            string imageFolder)
         {
             var drawing = cell.Descendants<Drawing>().FirstOrDefault();
             if (drawing == null) return (null, 0);
@@ -224,22 +261,34 @@ namespace FireEngineering
             string embedId = blip.Embed.Value;
             var imagePart = (ImagePart)doc.MainDocumentPart.GetPartById(embedId);
 
-            byte[] imageBytes;
-            using (var stream = new MemoryStream())
-            {
-                imagePart.GetStream().CopyTo(stream);
-                imageBytes = stream.ToArray();
-            }
-
-            // Check rotation
             int rotation = 0;
             var xfrm = drawing.Descendants<A.Transform2D>().FirstOrDefault();
-            if (xfrm != null && xfrm.Rotation != null)
+            if (xfrm?.Rotation != null)
             {
                 rotation = (int)xfrm.Rotation.Value; // in 1/60000 degree
             }
 
-            return (imageBytes, rotation);
+            Directory.CreateDirectory(imageFolder);
+            string imagePath = Path.Combine(imageFolder, $"{Guid.NewGuid():N}.img");
+
+            try
+            {
+                using var source = imagePart.GetStream();
+                using var output = new FileStream(imagePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                source.CopyTo(output);
+                output.Flush();
+
+                return (imagePath, rotation);
+            }
+            catch
+            {
+                if (File.Exists(imagePath))
+                {
+                    File.Delete(imagePath);
+                }
+
+                throw;
+            }
         }
 
         private static (string BrandText, string Serial) SplitBrandAndSerial(string input)

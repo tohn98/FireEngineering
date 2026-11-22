@@ -70,7 +70,7 @@ public static class WordTableWriter
         return cell;
     }
 
-    private static TableCell MakeImageCell(MainDocumentPart mainPart, (byte[]? data, int rotation) image, string width)
+    private static TableCell MakeImageCell(MainDocumentPart mainPart, (string? filePath, int rotation) image, string width)
     {
         TableCell cell = new TableCell(
             new TableCellProperties(
@@ -78,18 +78,19 @@ public static class WordTableWriter
             )
         );
 
-        if (image.data == null || image.data.Length == 0)
+        if (string.IsNullOrWhiteSpace(image.filePath) || !File.Exists(image.filePath))
         {
             cell.Append(new Paragraph(new Run(new Text(""))));
             return cell;
         }
 
         // Resize and convert to JPEG
-        image.data = ResizeAndConvertToJpeg(image.data);
+        byte[] imageData = File.ReadAllBytes(image.filePath);
+        imageData = ResizeAndConvertToJpeg(imageData);
 
         // Add image part
         var imagePart = mainPart.AddImagePart(ImagePartType.Jpeg);
-        using (var stream = new MemoryStream(image.data))
+        using (var stream = new MemoryStream(imageData))
         {
             imagePart.FeedData(stream);
         }

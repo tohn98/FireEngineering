@@ -11,7 +11,7 @@
         public string Changed { get; set; }
         public string ChangeDate { get; set; }
         public string WorkerName { get; set; }
-        public (byte[] data, int rotation) Signature { get; set; }
+        public (string? filePath, int rotation) Signature { get; set; }
         public int StickerId { get; set; }
 
         public string FutureChangeDate
