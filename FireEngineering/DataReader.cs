@@ -21,10 +21,11 @@ namespace FireEngineering
             string folderPath,
             DateTime startDate,
             string imageFolder,
+            int maxReaderConcurrency = 1,
             Action<string> logInfo = null,
             Action<int, int> readProgress = null)
         {
-            List<ProtocolDataModel> allRecords = new List<ProtocolDataModel>();
+            var recordsByFile = new System.Collections.Concurrent.ConcurrentDictionary<int, List<ProtocolDataModel>>();
 
             // Recursively get all .docx files in the folder and subfolders
             string[] files = Directory.GetFiles(folderPath, "*.docx", SearchOption.AllDirectories)
@@ -42,16 +43,24 @@ namespace FireEngineering
 
             int totalFiles = files.Length;
             int fileNumber = 0;
-
-            foreach (var file in files)
+            var parallelOptions = new ParallelOptions
             {
-                fileNumber++;
-                readProgress?.Invoke(fileNumber, totalFiles);
+                MaxDegreeOfParallelism = Math.Max(1, maxReaderConcurrency)
+            };
+
+            Parallel.ForEach(files.Select((file, index) => (file, index)), parallelOptions, fileItem =>
+            {
+                string file = fileItem.file;
+                int fileIndex = fileItem.index;
+                var fileRecords = new List<ProtocolDataModel>();
+                int currentFileNumber = Interlocked.Increment(ref fileNumber);
+                readProgress?.Invoke(currentFileNumber, totalFiles);
 
                 if (Path.GetFileName(file).StartsWith("~$", StringComparison.Ordinal))
                 {
                     logInfo?.Invoke($"Skipping Word temporary lock file: {file}");
-                    continue;
+                    recordsByFile[fileIndex] = fileRecords;
+                    return;
                 }
 
                 try
@@ -164,7 +173,7 @@ namespace FireEngineering
                             };
 
                             // Add record
-                            allRecords.Add(currentRecord);
+                            fileRecords.Add(currentRecord);
 
                             string month = rowChangeDate.ToString("yyyy-MM");
                             if (fileMonths.Add(month))
@@ -186,9 +195,13 @@ namespace FireEngineering
                         $"Message: {ex.Message}{Environment.NewLine}" +
                         $"StackTrace: {ex.StackTrace}");
                 }
-            }
+                recordsByFile[fileIndex] = fileRecords;
+            });
 
-            return allRecords;
+            return recordsByFile
+                .OrderBy(item => item.Key)
+                .SelectMany(item => item.Value)
+                .ToList();
         }
 
         public static string GetNumberedParagraphText(

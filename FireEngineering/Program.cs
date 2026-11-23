@@ -6,6 +6,7 @@
         {
             string folderPath = null;
             DateTime startDate = DateTime.MinValue;
+            int maxReaderConcurrency = 1;
 
             // Setup log file in Logs folder with timestamp
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -18,7 +19,10 @@
             {
                 try
                 {
-                    File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\r\n");
+                    lock (logPath)
+                    {
+                        File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\r\n");
+                    }
                 }
                 catch { }
             }
@@ -57,6 +61,18 @@
                     return;
                 }
                 outputFile = config.TryGetProperty("OutputFile", out var outProp) ? outProp.GetString() : null;
+                if (config.TryGetProperty("MaxReaderConcurrency", out var concurrencyProp) &&
+                    concurrencyProp.ValueKind == System.Text.Json.JsonValueKind.Number &&
+                    concurrencyProp.TryGetInt32(out var configuredConcurrency))
+                {
+                    if (configuredConcurrency < 1)
+                    {
+                        Log("MaxReaderConcurrency must be at least 1.");
+                        return;
+                    }
+
+                    maxReaderConcurrency = configuredConcurrency;
+                }
             }
             catch (Exception ex)
             {
@@ -87,6 +103,7 @@
                     folderPath,
                     startDate,
                     temporaryImageFolder,
+                    maxReaderConcurrency,
                     LogInfo,
                     (current, total) => Console.WriteLine($"Reading {current}/{total}"));
                 if(rows.Count == 0)
